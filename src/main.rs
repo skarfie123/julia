@@ -1,10 +1,16 @@
 use hsv::hsv_to_rgb;
 use image::{ImageBuffer, Rgb};
-use indicatif::ProgressIterator;
+use indicatif::{MultiProgress, ProgressBar};
 use nalgebra::{Complex, Normed};
+use std::thread;
 use std::time::Instant;
 
-const MAX_ITER: i32 = 16;
+const MAX_ITER: i32 = 36;
+const WIDTH: u32 = 1920;
+const HEIGHT: u32 = 1080;
+const SCALE: f64 = 3.0;
+
+const ASPECT: f64 = WIDTH as f64 / HEIGHT as f64;
 
 fn julia(c: Complex<f64>, x: f64, y: f64, max_iter: i32) -> f64 {
     let mut z = Complex::new(x, y);
@@ -21,17 +27,11 @@ fn julia(c: Complex<f64>, x: f64, y: f64, max_iter: i32) -> f64 {
 }
 
 fn generate_frame(max_iter: i32) {
-    let width = 1920 / 2;
-    let height = 1080 / 2;
-    let scale = 3.0;
-
-    let aspect = width as f64 / height as f64;
-
-    let mut img = ImageBuffer::new(width, height);
+    let mut img = ImageBuffer::new(WIDTH, HEIGHT);
 
     for (x, y, pixel) in img.enumerate_pixels_mut() {
-        let cx = (x as f64 / width as f64 - 0.5) * scale;
-        let cy = (y as f64 / height as f64 - 0.5) * scale / aspect;
+        let cx = (x as f64 / WIDTH as f64 - 0.5) * SCALE;
+        let cy = (y as f64 / HEIGHT as f64 - 0.5) * SCALE / ASPECT;
 
         let c = Complex::new(-0.8, 0.156);
         let value = julia(c, cx, cy, max_iter);
@@ -49,11 +49,30 @@ fn generate_frame(max_iter: i32) {
     img.save(format!("julia\\{}.png", max_iter)).unwrap();
 }
 
+fn generate_frames(frames: Vec<i32>, pb: &ProgressBar) {
+    for max_iter in frames {
+        generate_frame(max_iter);
+        pb.inc(1);
+    }
+}
+
 fn main() {
     let now = Instant::now();
-    for i in (0..MAX_ITER).progress() {
-        generate_frame(i);
+    let m = MultiProgress::new();
+    let frames = 0..MAX_ITER;
+    let num_threads = thread::available_parallelism().unwrap().get() as i32 - 1;
+    let mut threads: Vec<thread::JoinHandle<()>> = vec![];
+    for ti in 0..num_threads {
+        let group: Vec<i32> = frames
+            .clone()
+            .filter(move |i| i % num_threads == ti)
+            .collect();
+        let pb = m.add(ProgressBar::new(group.len() as u64));
+        let t = thread::spawn(move || generate_frames(group, &pb));
+        threads.push(t);
     }
-    let elapsed = now.elapsed();
-    println!("Elapsed: {:.2?}", elapsed);
+    for t in threads {
+        t.join().unwrap();
+    }
+    println!("Elapsed: {:.2?}", now.elapsed());
 }
