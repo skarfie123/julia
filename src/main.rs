@@ -8,10 +8,10 @@ use std::io::Write;
 use std::thread;
 use std::time::Instant;
 
-const MAX_ITER: i32 = 36 * 5;
+const MAX_ITER: i32 = 2400;
 
-const WIDTH: u32 = 1920 / 2;
-const HEIGHT: u32 = 1080 / 2;
+const WIDTH: u32 = 1920;
+const HEIGHT: u32 = 1080;
 const ASPECT: f64 = WIDTH as f64 / HEIGHT as f64;
 const SCALE: f64 = 3.0;
 
