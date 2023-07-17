@@ -3,19 +3,24 @@ use image::{ImageBuffer, Rgb};
 use indicatif::{MultiProgress, ProgressBar};
 use nalgebra::{Complex, Normed};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::thread;
 use std::time::Instant;
 
-const MAX_ITER: i32 = 36;
+const MAX_ITER: i32 = 36 * 5;
 
-const WIDTH: u32 = 1920;
-const HEIGHT: u32 = 1080;
+const WIDTH: u32 = 1920 / 2;
+const HEIGHT: u32 = 1080 / 2;
 const ASPECT: f64 = WIDTH as f64 / HEIGHT as f64;
 const SCALE: f64 = 3.0;
 
 const C: Complex<f64> = Complex::new(-0.8, 0.156);
 
 type Cache = HashMap<(u32, u32), i32>;
+
+const TIMINGS_FILE: &str = "timings.csv";
+type Timings = Vec<(i32, f32)>;
 
 fn julia(c: Complex<f64>, x: u32, y: u32, max_iter: i32, cache: &mut Cache) -> f64 {
     if let Some(&i) = cache.get(&(x, y)) {
@@ -59,12 +64,16 @@ fn generate_frame(max_iter: i32, cache: &mut Cache) {
     img.save(format!("julia\\{}.png", max_iter)).unwrap();
 }
 
-fn generate_frames(frames: Vec<i32>, pb: &ProgressBar) {
+fn generate_frames(frames: Vec<i32>, pb: &ProgressBar) -> Timings {
     let mut cache: Cache = HashMap::new();
+    let mut timings: Timings = vec![];
     for max_iter in frames {
+        let now = Instant::now();
         generate_frame(max_iter, &mut cache);
+        timings.push((max_iter, now.elapsed().as_secs_f32()));
         pb.inc(1);
     }
+    timings
 }
 
 fn main() {
@@ -75,7 +84,7 @@ fn main() {
     let frames = 0..MAX_ITER;
 
     let num_threads = thread::available_parallelism().unwrap().get() as i32 - 1;
-    let mut threads: Vec<thread::JoinHandle<()>> = vec![];
+    let mut threads: Vec<thread::JoinHandle<Timings>> = vec![];
 
     for ti in 0..num_threads {
         let group: Vec<i32> = frames
@@ -89,8 +98,19 @@ fn main() {
         threads.push(t);
     }
 
+    let mut file = File::create(TIMINGS_FILE).unwrap();
+    match file.write(b"frame, time") {
+        Ok(_) => (),
+        Err(e) => eprint!("Error Occurred: {}", e),
+    }
     for t in threads {
-        t.join().unwrap();
+        let timings = t.join().unwrap();
+        for (frame, timing) in timings {
+            match file.write(format!("\n{}, {}", frame, timing).as_bytes()) {
+                Ok(_) => (),
+                Err(e) => eprint!("Error Occurred: {}", e),
+            }
+        }
     }
 
     println!("Elapsed: {:.2?}", now.elapsed());
