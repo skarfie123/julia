@@ -1,8 +1,7 @@
 use hsv::hsv_to_rgb;
 use image::{ImageBuffer, Rgb};
 use indicatif::{MultiProgress, ProgressBar};
-use nalgebra::{Complex, Matrix, Normed};
-use std::collections::HashMap;
+use nalgebra::{Complex, DMatrix, Normed};
 use std::fs::File;
 use std::io::Write;
 use std::thread;
@@ -17,16 +16,17 @@ const SCALE: f64 = 3.0;
 
 const C: Complex<f64> = Complex::new(-0.8, 0.156);
 
-type Cache = HashMap<(u32, u32), i32>;
+type Cache = DMatrix<i32>;
 
 const TIMINGS_FILE: &str = "timings.csv";
 type Timings = Vec<(i32, f32)>;
 
 fn julia(c: Complex<f64>, x: u32, y: u32, max_iter: i32, cache: &mut Cache) -> i32 {
-    if let Some(&i) = cache.get(&(x, y)) {
+    let cached_value = cache[(x as usize, y as usize)];
+    if cached_value > 0 {
         // make sure it's not from a future frame
-        if i < max_iter {
-            return i;
+        if cached_value < max_iter {
+            return cached_value;
         }
     }
     let scaled_x = (x as f64 / WIDTH as f64 - 0.5) * SCALE;
@@ -35,7 +35,7 @@ fn julia(c: Complex<f64>, x: u32, y: u32, max_iter: i32, cache: &mut Cache) -> i
 
     for i in 0..max_iter {
         if z.norm() > 2.0 {
-            cache.insert((x, y), i);
+            cache[(x as usize, y as usize)] = i;
             return i;
         }
 
@@ -66,7 +66,7 @@ fn generate_frame(max_iter: i32, cache: &mut Cache) {
 }
 
 fn generate_frames(frames: Vec<i32>, pb: &ProgressBar) -> Timings {
-    let mut cache: Cache = HashMap::new();
+    let mut cache: Cache = DMatrix::<i32>::from_element(WIDTH as usize, HEIGHT as usize, -1);
     let mut timings: Timings = vec![];
     for max_iter in frames {
         let now = Instant::now();
