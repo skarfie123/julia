@@ -1,17 +1,17 @@
 use hsv::hsv_to_rgb;
 use image::{ImageBuffer, Rgb};
 use indicatif::{MultiProgress, ProgressBar};
-use nalgebra::{Complex, Normed};
+use nalgebra::{Complex, Matrix, Normed};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::thread;
 use std::time::Instant;
 
-const MAX_ITER: i32 = 2400;
+const MAX_ITER: i32 = 1000;
 
-const WIDTH: u32 = 1920;
-const HEIGHT: u32 = 1080;
+const WIDTH: u32 = 1920 / 4;
+const HEIGHT: u32 = 1080 / 4;
 const ASPECT: f64 = WIDTH as f64 / HEIGHT as f64;
 const SCALE: f64 = 3.0;
 
@@ -22,11 +22,11 @@ type Cache = HashMap<(u32, u32), i32>;
 const TIMINGS_FILE: &str = "timings.csv";
 type Timings = Vec<(i32, f32)>;
 
-fn julia(c: Complex<f64>, x: u32, y: u32, max_iter: i32, cache: &mut Cache) -> f64 {
+fn julia(c: Complex<f64>, x: u32, y: u32, max_iter: i32, cache: &mut Cache) -> i32 {
     if let Some(&i) = cache.get(&(x, y)) {
         // make sure it's not from a future frame
         if i < max_iter {
-            return i as f64 / max_iter as f64;
+            return i;
         }
     }
     let scaled_x = (x as f64 / WIDTH as f64 - 0.5) * SCALE;
@@ -36,13 +36,13 @@ fn julia(c: Complex<f64>, x: u32, y: u32, max_iter: i32, cache: &mut Cache) -> f
     for i in 0..max_iter {
         if z.norm() > 2.0 {
             cache.insert((x, y), i);
-            return i as f64 / max_iter as f64;
+            return i;
         }
 
         z = z * z + c;
     }
 
-    -1.0
+    -1
 }
 
 fn generate_frame(max_iter: i32, cache: &mut Cache) {
@@ -51,12 +51,13 @@ fn generate_frame(max_iter: i32, cache: &mut Cache) {
     for (x, y, pixel) in img.enumerate_pixels_mut() {
         let value = julia(C, x, y, max_iter, cache);
 
-        if value == -1.0 {
+        if value == -1 {
             *pixel = Rgb([0, 0, 0]);
             continue;
         }
 
-        let (r, g, b) = hsv_to_rgb(360.0 * value, 1.0, value.powf(0.25));
+        let normalised_value: f64 = value as f64 / max_iter as f64;
+        let (r, g, b) = hsv_to_rgb(360.0 * normalised_value, 1.0, normalised_value.powf(0.25));
 
         *pixel = Rgb([r, g, b]);
     }
