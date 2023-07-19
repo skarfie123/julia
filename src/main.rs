@@ -1,3 +1,4 @@
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use hsv::hsv_to_rgb;
 use image::{ImageBuffer, Rgb};
 use indicatif::{MultiProgress, ProgressBar};
@@ -77,7 +78,7 @@ fn generate_frame(max_iter: i32, data: &Julia) {
     img.save(format!("julia\\{}.png", max_iter)).unwrap();
 }
 
-fn generate_frames(frames: Vec<i32>, pb: &ProgressBar, data: &Julia) -> Timings {
+fn generate_frames(frames: Receiver<i32>, pb: &ProgressBar, data: &Julia) -> Timings {
     let mut timings: Timings = vec![];
     for max_iter in frames {
         let now = Instant::now();
@@ -99,19 +100,24 @@ fn main() {
 
     let num_threads = thread::available_parallelism().unwrap().get() as i32 - 1;
     let mut threads: Vec<thread::JoinHandle<Timings>> = vec![];
-
     let pb = m.add(ProgressBar::new(MAX_ITER as u64));
-    for ti in 0..num_threads {
-        let data = data.clone();
-        let pb = pb.clone();
-        let group: Vec<i32> = frames
-            .clone()
-            .filter(move |i| i % num_threads == ti)
-            .collect();
 
-        let t = thread::spawn(move || generate_frames(group, &pb, &data));
-        threads.push(t);
+    let (frame_sender, frame_receiver): (Sender<i32>, Receiver<i32>) = unbounded();
+
+    for i in frames {
+        frame_sender.send(i).unwrap();
     }
+
+    for _ in 0..num_threads {
+        let frame_receiver = frame_receiver.clone();
+        let pb = pb.clone();
+        let data = data.clone();
+
+        threads.push(thread::spawn(move || {
+            generate_frames(frame_receiver, &pb, &data)
+        }));
+    }
+    drop(frame_sender);
 
     let mut file = File::create(TIMINGS_FILE).unwrap();
     match file.write(b"frame, time") {
