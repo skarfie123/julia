@@ -41,16 +41,13 @@ fn julia(c: Complex<f64>, x: u32, y: u32) -> i32 {
 
 fn generate_julias(m: &MultiProgress) -> Julia {
     let pb_x = m.add(ProgressBar::new(WIDTH as u64));
-    let pb_y = m.add(ProgressBar::new(HEIGHT as u64));
 
     let mut data: Julia = DMatrix::<i32>::from_element(WIDTH as usize, HEIGHT as usize, -1);
 
     for x in 0..WIDTH {
-        pb_y.set_position(0);
         for y in 0..HEIGHT {
             let value = julia(C, x, y);
             data[(x as usize, y as usize)] = value;
-            pb_y.inc(1);
         }
         pb_x.inc(1);
     }
