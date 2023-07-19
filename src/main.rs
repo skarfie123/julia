@@ -100,14 +100,14 @@ fn main() {
     let num_threads = thread::available_parallelism().unwrap().get() as i32 - 1;
     let mut threads: Vec<thread::JoinHandle<Timings>> = vec![];
 
+    let pb = m.add(ProgressBar::new(MAX_ITER as u64));
     for ti in 0..num_threads {
         let data = data.clone();
+        let pb = pb.clone();
         let group: Vec<i32> = frames
             .clone()
             .filter(move |i| i % num_threads == ti)
             .collect();
-
-        let pb = m.add(ProgressBar::new(group.len() as u64));
 
         let t = thread::spawn(move || generate_frames(group, &pb, &data));
         threads.push(t);
@@ -127,6 +127,7 @@ fn main() {
             }
         }
     }
+    pb.finish_and_clear();
 
     println!("Elapsed: {:.2?}", now.elapsed());
 }
