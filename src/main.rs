@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
 
-const MAX_ITER: i32 = 1000;
+const MAX_ITER: i32 = 10000;
 
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
@@ -24,6 +24,10 @@ type Julia = DMatrix<i32>;
 
 const TIMINGS_FILE: &str = "timings.csv";
 type Timings = Vec<(i32, f32)>;
+
+fn num_threads() -> usize {
+    thread::available_parallelism().unwrap().get() - 1
+}
 
 fn julia(c: Complex<f64>, x: u32, y: u32) -> i32 {
     let scaled_x = (x as f64 / WIDTH as f64 - 0.5) * SCALE;
@@ -41,17 +45,43 @@ fn julia(c: Complex<f64>, x: u32, y: u32) -> i32 {
     -1
 }
 
-fn generate_julias(m: &MultiProgress) -> Julia {
-    let pb_x = m.add(ProgressBar::new(WIDTH as u64));
+fn generate_julia(m: &MultiProgress) -> Julia {
+    type Pixels = (u32, u32);
+    type PixelResults = Vec<(u32, u32, i32)>;
 
-    let mut data: Julia = DMatrix::<i32>::from_element(WIDTH as usize, HEIGHT as usize, -1);
+    let mut threads: Vec<thread::JoinHandle<PixelResults>> = vec![];
+    let pb = m.add(ProgressBar::new((WIDTH * HEIGHT) as u64)); // # TODO
+
+    let (pixel_sender, pixel_receiver): (Sender<Pixels>, Receiver<Pixels>) = unbounded();
 
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
-            let value = julia(C, x, y);
+            pixel_sender.send((x, y)).unwrap();
+        }
+    }
+
+    let mut data: Julia = DMatrix::<i32>::from_element(WIDTH as usize, HEIGHT as usize, -1);
+
+    for _ in 0..num_threads() {
+        let pixel_receiver = pixel_receiver.clone();
+        let pb = pb.clone();
+
+        threads.push(thread::spawn(move || {
+            let mut pixels: PixelResults = vec![];
+            for (x, y) in pixel_receiver {
+                pixels.push((x, y, julia(C, x, y)));
+                pb.inc(1);
+            }
+            pixels
+        }));
+    }
+    drop(pixel_sender);
+
+    for t in threads {
+        let pixels: PixelResults = t.join().unwrap();
+        for (x, y, value) in pixels {
             data[(x as usize, y as usize)] = value;
         }
-        pb_x.inc(1);
     }
 
     data
@@ -93,7 +123,7 @@ fn main() {
 
     let m = MultiProgress::new();
 
-    let data: Arc<Julia> = Arc::new(generate_julias(&m));
+    let data: Arc<Julia> = Arc::new(generate_julia(&m));
 
     println!("Elapsed: {:.2?}", now.elapsed());
 
@@ -103,7 +133,6 @@ fn main() {
         0..data.max() + 1
     };
 
-    let num_threads = thread::available_parallelism().unwrap().get() as i32 - 1;
     let mut threads: Vec<thread::JoinHandle<Timings>> = vec![];
     let pb = m.add(ProgressBar::new(MAX_ITER as u64));
 
@@ -113,7 +142,7 @@ fn main() {
         frame_sender.send(i).unwrap();
     }
 
-    for _ in 0..num_threads {
+    for _ in 0..num_threads() {
         let frame_receiver = frame_receiver.clone();
         let pb = pb.clone();
         let data = data.clone();
