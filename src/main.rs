@@ -94,6 +94,9 @@ fn main() {
     let m = MultiProgress::new();
 
     let data: Arc<Julia> = Arc::new(generate_julias(&m));
+
+    println!("Elapsed: {:.2?}", now.elapsed());
+
     let frames = if FINAL_FRAME_ONLY {
         data.max()..data.max() + 1
     } else {
@@ -137,5 +140,5 @@ fn main() {
     }
     pb.finish_and_clear();
 
-    println!("Elapsed: {:.2?}", now.elapsed());
+    println!("Total Elapsed: {:.2?}", now.elapsed());
 }
