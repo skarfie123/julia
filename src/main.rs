@@ -11,10 +11,12 @@ use std::time::Instant;
 
 const MAX_ITER: i32 = 1000;
 
-const WIDTH: u32 = 1920 / 4;
-const HEIGHT: u32 = 1080 / 4;
+const WIDTH: u32 = 1920;
+const HEIGHT: u32 = 1080;
 const ASPECT: f64 = WIDTH as f64 / HEIGHT as f64;
 const SCALE: f64 = 3.0;
+
+const FINAL_FRAME_ONLY: bool = true;
 
 const C: Complex<f64> = Complex::new(-0.8, 0.156);
 
@@ -92,7 +94,11 @@ fn main() {
     let m = MultiProgress::new();
 
     let data: Arc<Julia> = Arc::new(generate_julias(&m));
-    let frames = 0..data.max() + 1;
+    let frames = if FINAL_FRAME_ONLY {
+        data.max()..data.max() + 1
+    } else {
+        0..data.max() + 1
+    };
 
     let num_threads = thread::available_parallelism().unwrap().get() as i32 - 1;
     let mut threads: Vec<thread::JoinHandle<Timings>> = vec![];
