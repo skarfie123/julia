@@ -1,3 +1,5 @@
 /target
+*.bmp
+*.jpg
 *.png
 timings.csv

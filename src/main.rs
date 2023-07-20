@@ -3,6 +3,7 @@ use hsv::hsv_to_rgb;
 use image::{ImageBuffer, Rgb};
 use indicatif::{MultiProgress, ProgressBar};
 use nalgebra::{Complex, DMatrix, Normed};
+use std::f64::consts::PI;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
@@ -14,9 +15,11 @@ const MAX_ITER: i32 = 10000;
 const WIDTH: u32 = 1920;
 const HEIGHT: u32 = 1080;
 const ASPECT: f64 = WIDTH as f64 / HEIGHT as f64;
-const SCALE: f64 = 3.0;
+const SCALE: f64 = PI;
 
-const FINAL_FRAME_ONLY: bool = true;
+const FOLDER: &str = "julia";
+const EXTENSION: &str = "bmp";
+const FINAL_FRAME_ONLY: bool = false;
 
 const C: Complex<f64> = Complex::new(-0.8, 0.156);
 
@@ -104,7 +107,8 @@ fn generate_frame(max_iter: i32, data: &Julia) {
         *pixel = Rgb([r, g, b]);
     }
 
-    img.save(format!("julia\\{}.png", max_iter)).unwrap();
+    img.save(format!("{FOLDER}\\{}.{EXTENSION}", max_iter))
+        .unwrap();
 }
 
 fn generate_frames(frames: Receiver<i32>, pb: &ProgressBar, data: &Julia) -> Timings {
