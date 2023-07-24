@@ -4,7 +4,7 @@ use image::{ImageBuffer, Rgb};
 use indicatif::{MultiProgress, ProgressBar};
 use nalgebra::{Complex, DMatrix, Normed};
 use std::f64::consts::PI;
-use std::fs::File;
+use std::fs::{create_dir_all, File};
 use std::io::Write;
 use std::sync::Arc;
 use std::thread;
@@ -124,6 +124,8 @@ fn generate_frames(frames: Receiver<i32>, pb: &ProgressBar, data: &Julia) -> Tim
 
 fn main() {
     let now = Instant::now();
+
+    create_dir_all(FOLDER).unwrap();
 
     let m = MultiProgress::new();
 
