@@ -138,7 +138,7 @@ fn main() {
     };
 
     let mut threads: Vec<thread::JoinHandle<Timings>> = vec![];
-    let pb = m.add(ProgressBar::new(MAX_ITER as u64));
+    let pb = m.add(ProgressBar::new(data.max() as u64));
 
     let (frame_sender, frame_receiver): (Sender<i32>, Receiver<i32>) = unbounded();
 
