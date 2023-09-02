@@ -16,4 +16,4 @@ $folderName = Split-Path -Path $folder -Leaf
 $outputPath = Join-Path output "$folderName.mp4"
 
 
-ffmpeg -i "$inputPath" -r 24 -c:v libx264 -preset slow -crf 18 $outputPath
+ffmpeg -i "$inputPath" -r 24 -c:v libx264 -preset slow -vf format=yuv420p -crf 18 $outputPath
